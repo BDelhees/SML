@@ -301,6 +301,10 @@ df <- subset(df, df$area < 400)
 
 ## Split the dataset, 80:20 approach
 
+# set seed
+
+set.seed(123)
+
 train.size = dim(df)[1] * 0.8
 train = sample(1:dim(df)[1], train.size)
 test = -train
@@ -318,7 +322,7 @@ tail(df)
 typeof(df)
 str(df)
 
-hist(df$rent_full, breaks = 100, xlab = "Rent in CHF", col = "red")
+hist(df$rent_full, breaks = 100, xlab = "Rent in CHF", col = "red", main = "Histogram Rent")
 summary(df$rent_full)
 
 
@@ -582,26 +586,24 @@ summary(lm(rent_full~quarter_specific, df.train)) #Variable doesnt really make s
 library(olsrr)
 library(caret)
 library(tidyverse)
-
-# set seed
-
-set.seed(123)
+library(Metrics)
 
 
 model.s <- lm(rent_full ~ area, data = df.train)
 
 
-p.s <- model.s %>% predict(df.train)
-data.frame( R2 = R2(p.s, df.train$rent_full),
-            RMSE = RMSE(p.s, df.train$rent_full),
-            MAE = MAE(p.s, df.train$rent_full))
+p.s <- model.s %>% predict(df.test)
+data.frame( R2 = R2(p.s, df.test$rent_full),
+            RMSE = RMSE(p.s, df.test$rent_full),
+            MAE = MAE(p.s, df.test$rent_full),
+            rae = rae(p.m, df.test$rent_full))
 
-# R2 = 0.4778882   RMSE = 495.7553   MAE =342.2822
+# R2 = 0.4792411   RMSE = 493.7145   MAE =339.1548   RAE= 0.8428427
 
 
 RMSE(p.s, df.test$rent_full)/mean(df.test$rent_full)
 
-# RMSE = 0.482804
+# RMSE = 0.2866804
 
 view(p.s)
 
@@ -615,7 +617,10 @@ AIC(model.s) # AIC = 862197.6
 
 
 
-options(max.print=1000000)
+options(max.print=1000000) #Shows the whole output in console
+
+# Factor variables
+
 summary(lm(rent_full~KTKZ +balcony+  basement+ bath+ bright +cabletv+ cheminee+ dishwasher+
            dryer+ elevator+ furnished+ heating_air+ heating_earth+
            heating_electro+ heating_far+ heating_gas+ heating_oil+ heating_pellets+
@@ -630,12 +635,12 @@ summary(lm(rent_full~KTKZ +balcony+  basement+ bath+ bright +cabletv+ cheminee+ 
 
 # * bath, dryer, furnished, heating_oil
 
-# adj. R2 = 0.2442
+# adj. R2 = 0.6031
 
 
 
 
-# All continous variables
+# Continous variables
 
 summary(lm(rent_full~area+ year_built+ Micro_rating+ Anteil_auslaend+ Avg_age+ Avg_size_household+
              Noise_max+ anteil_efh+ apoth_pix_count_km2+ avg_anzhl_geschosse+ avg_bauperiode+ dist_to_4G+
@@ -655,13 +660,11 @@ summary(lm(rent_full~ ., df.train)) #This does not work due to some factor varia
 ## Manual backward selection
 # Combine binary and continous regressions
 
-##excl. heating_electro
 summary(lm(rent_full~KTKZ+area+ year_built+ Micro_rating+ Anteil_auslaend+ Avg_age+ Avg_size_household+
              Noise_max+ anteil_efh+ apoth_pix_count_km2+ avg_anzhl_geschosse+ avg_bauperiode+ dist_to_4G+
              dist_to_5G+ dist_to_haltst+ dist_to_highway+ dist_to_lake+ dist_to_main_stat+
              dist_to_school_1+ dist_to_train_stat+ dist_to_river+ geb_wohnnutz_total+ max_guar_down_speed+
-             restaur_pix_count_km2+ superm_pix_count_km2+ wgh_avg_sonnenklasse_per_egid.1+
-             +balcony+
+             restaur_pix_count_km2+ superm_pix_count_km2+ wgh_avg_sonnenklasse_per_egid.1++balcony+
              basement+ bath+ bright +cabletv+ cheminee+ dishwasher+dryer+ elevator+ furnished+ heating_air+
              heating_earth+heating_far+ heating_gas+ heating_oil+ heating_pellets+
              kids_friendly+laundry+middle_house+new_building+newly_built+oldbuilding+
@@ -717,57 +720,145 @@ view(na_count1)
 
 
 
+## Final Model, Excluded further variables 
 
-
-## Final Model, Excluded further variables
-
-summary(lm(rent_full~area+ Micro_rating+ Anteil_auslaend+ Avg_age+ Avg_size_household+
+model.f <- (lm(rent_full~area+ Micro_rating+ Anteil_auslaend+ Avg_age+ Avg_size_household+
               avg_bauperiode+dist_to_5G+ dist_to_haltst+ 
               dist_to_lake+ dist_to_main_stat+ dist_to_train_stat+
               superm_pix_count_km2+ cheminee+ elevator+newly_built+
               parking_indoor+ terrace+ rooms+msregion, df.train))
 
+summary(model.f)
 
 # R2 = 0.7253
 
 
-## Corrected final Model: Excl. Variables which give Error messages when predicting (rooms, msregion, KTKZ)
+## Corrected final Model: Excl. Variables which give Error messages when predicting (rooms, msregion, KTKZ) or have too many NAs
 
-model.m <- lm(rent_full~area+ Micro_rating+ Anteil_auslaend+ Avg_age+ Avg_size_household+
-               avg_bauperiode+dist_to_5G+ dist_to_haltst+ 
-               dist_to_lake+ dist_to_main_stat+ dist_to_train_stat+
-               superm_pix_count_km2+ cheminee+ elevator+newly_built+
-               parking_indoor+ terrace, df.train)
+model.m <- lm(rent_full~area+ Micro_rating+dist_to_5G+
+               superm_pix_count_km2+ cheminee+ elevator+
+                newly_built+parking_indoor, df.train)
 
 summary(model.m)
 
-# R2 = 0.5784
+# R2 = 0.5308
 
 ### Predictions: Multiple Regresison
 
 
-p1 <- predict(model, df.test) # This one does not work properly because of the facotor variables room, msregion & KTKZ
+p.f <- predict(model.f, df.test) # This one does not work properly because of the facotor variables rooms, msregion & KTKZ
 
 
 
-p.m <- predict(model.m, df.test)
+p.m <- model.m %>% predict(df.test)
+data.frame( R2 = R2(p.m, df.test$rent_full),
+            RMSE = RMSE(p.m, df.test$rent_full),
+            MAE = MAE(p.m, df.test$rent_full),
+            rae = rae(p.m, df.test$rent_full))
 
-view(p.m)
 
 
-predictions <- model.m %>% predict(df.test)
 
-data.frame( R2 = R2(predictions, df.test$rent_full),
-            RMSE = RMSE(predictions, df.test$rent_full),
-            MAE = MAE(predictions, df.test$rent_full))
+# R2 = 0.5309   RMSE = 468.5132   MAE = 323.0576   RAE = 0.8428427
 
-data.frame( R2 = R2(p, df.test$rent_full),
-            RMSE = RMSE(p, df.test$rent_full),
-            MAE = MAE(p, df.test$rent_full))
 
-p <- as.data.frame(p)
+RMSE(p.m, df.test$rent_full)/mean(df.test$rent_full) # = 0.272047
 
-BIC(model1)
-AIC(model1)
 
-### Crossvalidation
+
+
+
+### Cross-validation
+
+
+
+
+
+## K-fold cross-validation
+
+
+
+# Define training control
+set.seed(123) 
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+cv.m1 <- train(rent_full~area+ Micro_rating+dist_to_5G+
+              superm_pix_count_km2+ cheminee+ elevator+
+              newly_built+parking_indoor, 
+              data = df, 
+              method = "lm",
+              trControl = train.control)
+# Summarize the results
+print(cv.m1)
+
+
+# Output: 
+
+# 70672 samples
+# 8 predictor
+
+# No pre-processing
+# Resampling: Cross-Validated (10 fold) 
+# Summary of sample sizes: 63605, 63605, 63605, 63606, 63605, 63605, ... 
+# Resampling results:
+  
+#  RMSE      Rsquared   MAE     
+# 469.7365  0.5307361  324.3628
+
+# Tuning parameter 'intercept' was held constant at a value of TRUE
+
+
+
+
+
+## Repeated K-fold Cross-validation
+
+
+set.seed(123)
+train.control <- trainControl(method = "repeatedcv", 
+                              number = 10, repeats = 10)
+# Train the model
+cv.m2 <- train(rent_full~area+ Micro_rating+dist_to_5G+
+               superm_pix_count_km2+ cheminee+ elevator+
+               newly_built+parking_indoor, 
+               data = df, 
+               method = "lm",
+               trControl = train.control)
+# Summarize the results
+print(cv.m2)
+
+
+# Output: 
+
+# 70672 samples
+# 8 predictor
+
+# No pre-processing
+# Resampling: Cross-Validated (10 fold, repeated 10 times) 
+# Summary of sample sizes: 63605, 63605, 63605, 63606, 63605, 63605, ... 
+# Resampling results:
+  
+#  RMSE      Rsquared   MAE     
+# 469.7177  0.5308169  324.3529
+
+#Tuning parameter 'intercept' was held constant at a value of TRUE
+
+
+
+
+
+## Repeated K-fold Cross-validation
+
+
+set.seed(123)
+train.control <- trainControl(method = "repeatedcv", 
+                              number = 10, repeats = 10)
+# Train the model
+cv.m2 <- train(rent_full~area, 
+               data = df, 
+               method = "lm",
+               trControl = train.control)
+# Summarize the results
+print(cv.m2)
+
