@@ -17,10 +17,9 @@ library(plyr)
 
 
 ## Get data
-#https://github.com/vitorkrasniqi/Real_Estate_Analytics
 
 getwd()
-setwd("C:/Users/budde/OneDrive/UniLU MA/Semester 3/Supervised ML/Final Project")
+setwd("C:/...")
 
 
 df <- read.csv("training.csv", sep = ",", header = TRUE)
