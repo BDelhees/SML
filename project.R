@@ -17,9 +17,10 @@ library(plyr)
 
 
 ## Get data
+#https://github.com/vitorkrasniqi/Real_Estate_Analytics
 
 getwd()
-setwd("C:/...")
+setwd("C:/Users/budde/OneDrive/UniLU MA/Semester 3/Supervised ML/Final Project")
 
 
 df <- read.csv("training.csv", sep = ",", header = TRUE)
@@ -732,15 +733,19 @@ summary(model.f)
 # R2 = 0.7253
 
 
-## Corrected final Model: Excl. Variables which give Error messages when predicting (rooms, msregion, KTKZ) or have too many NAs
+## Corrected final Model: Excl. Variables which have too many NAs (produces issues with the msregion & rooms)
 
 model.m <- lm(rent_full~area+ Micro_rating+dist_to_5G+
-               superm_pix_count_km2+ cheminee+ elevator+
-                newly_built+parking_indoor, df.train)
+              superm_pix_count_km2+ cheminee+ elevator+
+              newly_built+parking_indoor+msregion+rooms, df.train)
 
 summary(model.m)
 
-# R2 = 0.5308
+
+# adj. R2 = 0.7146
+
+
+
 
 ### Predictions: Multiple Regresison
 
@@ -758,10 +763,10 @@ data.frame( R2 = R2(p.m, df.test$rent_full),
 
 
 
-# R2 = 0.5309   RMSE = 468.5132   MAE = 323.0576   RAE = 0.8428427
+# R2 = 0.7109305   RMSE = 366.5258   MAE = 247.7542   RAE = 0.5464055
 
 
-RMSE(p.m, df.test$rent_full)/mean(df.test$rent_full) # = 0.272047
+RMSE(p.m, df.test$rent_full)/mean(df.test$rent_full) # = 0.2125422
 
 
 
@@ -773,7 +778,7 @@ RMSE(p.m, df.test$rent_full)/mean(df.test$rent_full) # = 0.272047
 
 
 
-## K-fold cross-validation
+## 1. K-fold cross-validation Multiple Regression
 
 
 
@@ -784,7 +789,7 @@ train.control <- trainControl(method = "cv", number = 10)
 # Train the model
 cv.m1 <- train(rent_full~area+ Micro_rating+dist_to_5G+
               superm_pix_count_km2+ cheminee+ elevator+
-              newly_built+parking_indoor, 
+              newly_built+parking_indoor+msregion+rooms, 
               data = df, 
               method = "lm",
               trControl = train.control)
@@ -795,7 +800,7 @@ print(cv.m1)
 # Output: 
 
 # 70672 samples
-# 8 predictor
+# 10 predictor
 
 # No pre-processing
 # Resampling: Cross-Validated (10 fold) 
@@ -803,7 +808,7 @@ print(cv.m1)
 # Resampling results:
   
 #  RMSE      Rsquared   MAE     
-# 469.7365  0.5307361  324.3628
+# 367.241  0.7132138  247.0824
 
 # Tuning parameter 'intercept' was held constant at a value of TRUE
 
@@ -811,16 +816,16 @@ print(cv.m1)
 
 
 
-## Repeated K-fold Cross-validation
+## 2. Repeated K-fold Cross-validation Multiple Regression
 
 
 set.seed(123)
 train.control <- trainControl(method = "repeatedcv", 
-                              number = 10, repeats = 10)
+                              number = 10, repeats = 5)
 # Train the model
 cv.m2 <- train(rent_full~area+ Micro_rating+dist_to_5G+
                superm_pix_count_km2+ cheminee+ elevator+
-               newly_built+parking_indoor, 
+               newly_built+parking_indoor+msregion+rooms, 
                data = df, 
                method = "lm",
                trControl = train.control)
@@ -831,7 +836,7 @@ print(cv.m2)
 # Output: 
 
 # 70672 samples
-# 8 predictor
+# 10 predictor
 
 # No pre-processing
 # Resampling: Cross-Validated (10 fold, repeated 10 times) 
@@ -839,25 +844,113 @@ print(cv.m2)
 # Resampling results:
   
 #  RMSE      Rsquared   MAE     
-# 469.7177  0.5308169  324.3529
+# 367.272  0.7131887  247.0994
 
 #Tuning parameter 'intercept' was held constant at a value of TRUE
 
 
 
 
+## 3. K-fold cross-validation Univariate regression
 
-## Repeated K-fold Cross-validation
+
+
+# Define training control
+set.seed(123) 
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+cv.s1 <- train(rent_full~area, 
+               data = df, 
+               method = "lm",
+               trControl = train.control)
+# Summarize the results
+print(cv.s1)
+
+
+# Output: 
+
+# 70672 samples
+# 1 predictor
+
+# No pre-processing
+# Resampling: Cross-Validated (10 fold) 
+# Summary of sample sizes: 63605, 63605, 63605, 63606, 63605, 63605, ... 
+# Resampling results:
+
+#  RMSE      Rsquared   MAE     
+# 495.298   0.4782797  341.4196
+
+# Tuning parameter 'intercept' was held constant at a value of TRUE
+
+
+
+
+
+
+
+## 4. Repeated K-fold Cross-validation for univariate Regression model
 
 
 set.seed(123)
 train.control <- trainControl(method = "repeatedcv", 
                               number = 10, repeats = 10)
 # Train the model
-cv.m2 <- train(rent_full~area, 
+cv.s2 <- train(rent_full~area, 
                data = df, 
                method = "lm",
                trControl = train.control)
 # Summarize the results
-print(cv.m2)
+print(cv.s2)
+
+
+
+
+# Output: 
+
+# No pre-processing
+# Resampling: Cross-Validated (10 fold, repeated 10 times) 
+# Summary of sample sizes: 63605, 63605, 63605, 63606, 63605, 63605, ... 
+# Resampling results:
+  
+#  RMSE      Rsquared   MAE     
+# 495.3149  0.4782875  341.4251
+
+# Tuning parameter 'intercept' was held constant at a value of TRUE
+
+
+
+
+
+
+
+### Lasso Regression
+# https://www.pluralsight.com/guides/linear-lasso-and-ridge-regression-with-r
+# https://stats.stackexchange.com/questions/245552/lasso-ridge-regressions-with-binary-factors
+
+library(plyr)
+library(readr)
+library(dplyr)
+library(caret)
+library(ggplot2)
+library(repr)
+library(glmnet)
+
+
+glimpse(df.train)
+
+# Create matrix since glmnet does not work with data frames
+
+df.train.m <- data.matrix(df.train, rownames.force = NA)
+
+
+lambdas <- 10^seq(2, -3, by = -.1)
+
+# Setting alpha = 1 implements lasso regression
+lasso_reg <- cv.glmnet(df.train.m, df.train.m$rent_full, alpha = 1, lambda = lambdas, standardize = TRUE, nfolds = 5)
+
+# Best 
+lambda_best <- lasso_reg$lambda.min 
+lambda_best
+
 
