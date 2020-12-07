@@ -20,7 +20,7 @@ library(plyr)
 
 
 getwd()
-setwd("C:/Users/budde/OneDrive/UniLU MA/Semester 3/Supervised ML/Final Project")
+setwd("...")
 
 
 df <- read.csv("training.csv", sep = ",", header = TRUE)
