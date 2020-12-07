@@ -17,7 +17,7 @@ library(plyr)
 
 
 ## Get data
-#https://github.com/vitorkrasniqi/Real_Estate_Analytics
+
 
 getwd()
 setwd("C:/Users/budde/OneDrive/UniLU MA/Semester 3/Supervised ML/Final Project")
@@ -671,6 +671,16 @@ summary(lm(rent_full~KTKZ+area+ year_built+ Micro_rating+ Anteil_auslaend+ Avg_a
              parking_indoor+parking_outside+playground+pool+quiet+ raised_groundfloor+
              shower+sunny+ terrace+ toilets+ topstorage+water+msregion+rooms, df.train))
 
+BIC(lm(rent_full~KTKZ+area+ year_built+ Micro_rating+ Anteil_auslaend+ Avg_age+ Avg_size_household+
+         Noise_max+ anteil_efh+ apoth_pix_count_km2+ avg_anzhl_geschosse+ avg_bauperiode+ dist_to_4G+
+         dist_to_5G+ dist_to_haltst+ dist_to_highway+ dist_to_lake+ dist_to_main_stat+
+         dist_to_school_1+ dist_to_train_stat+ dist_to_river+ geb_wohnnutz_total+ max_guar_down_speed+
+         restaur_pix_count_km2+ superm_pix_count_km2+ wgh_avg_sonnenklasse_per_egid.1++balcony+
+         basement+ bath+ bright +cabletv+ cheminee+ dishwasher+dryer+ elevator+ furnished+ heating_air+
+         heating_earth+heating_far+ heating_gas+ heating_oil+ heating_pellets+
+         kids_friendly+laundry+middle_house+new_building+newly_built+oldbuilding+
+         parking_indoor+parking_outside+playground+pool+quiet+ raised_groundfloor+
+         shower+sunny+ terrace+ toilets+ topstorage+water+msregion+rooms, df.train))
 
 ## Exclude all variables which are less than ** p-values
 
@@ -745,6 +755,13 @@ summary(model.m)
 # adj. R2 = 0.7146
 
 
+
+# Without binary variables
+
+summary(lm(rent_full~area+ Micro_rating+dist_to_5G+
+             superm_pix_count_km2+msregion+rooms, df.train))
+
+# adj. R2 = 0.7009
 
 
 ### Predictions: Multiple Regresison
@@ -924,33 +941,339 @@ print(cv.s2)
 
 
 
-### Lasso Regression
-# https://www.pluralsight.com/guides/linear-lasso-and-ridge-regression-with-r
-# https://stats.stackexchange.com/questions/245552/lasso-ridge-regressions-with-binary-factors
-
-library(plyr)
-library(readr)
-library(dplyr)
-library(caret)
-library(ggplot2)
-library(repr)
-library(glmnet)
 
 
-glimpse(df.train)
+### Subset FORWARD regression
 
-# Create matrix since glmnet does not work with data frames
+# Ideally select all significant variables from the regressions above (not all variables to keep run-to a minimum)
 
-df.train.m <- data.matrix(df.train, rownames.force = NA)
+# Most variables cause the folowing error: 
+
+#Error in if (pvals[minp] <= penter) { : argument is of length zero
+#In addition: Warning messages:
+#  1: In if (pvals[minp] <= penter) { :
+#      the condition has length > 1 and only the first element will be used
+#  2: In min(pvals, na.rm = TRUE) :
+#      no non-missing arguments to min; returning Inf
+
+# Even when including only variables with no NAs (for multi level factor variables might be hard to distinguish)
+
+model.x <- lm(rent_full~area+ Micro_rating+newly_built+cheminee+parking_indoor+dist_to_train_stat+cabletv+
+                elevator+dishwasher+balcony+terrace+pool+month+basement+KTKZ+Noise_max, data = df.train)
+
+k <- ols_step_forward_p(model.x, na.rm = TRUE)
+plot(k)
+
+ols_step_forward_p(model.x, details = TRUE)
 
 
-lambdas <- 10^seq(2, -3, by = -.1)
+p.x <- model.x %>% predict(df.test)
+data.frame( R2 = R2(p.x, df.test$rent_full),
+            RMSE = RMSE(p.x, df.test$rent_full),
+            MAE = MAE(p.x, df.test$rent_full),
+            RAE = rae(p.x, df.test$rent_full))
 
-# Setting alpha = 1 implements lasso regression
-lasso_reg <- cv.glmnet(df.train.m, df.train.m$rent_full, alpha = 1, lambda = lambdas, standardize = TRUE, nfolds = 5)
+view(p.x)
 
-# Best 
-lambda_best <- lasso_reg$lambda.min 
-lambda_best
+
+
+
+
+### Subset BACKWARD regression
+
+model.y <- lm(rent_full~area+ Micro_rating+newly_built+cheminee+parking_indoor+dist_to_train_stat+cabletv+
+                elevator+dishwasher+balcony+terrace+pool+month+basement+KTKZ+Noise_max, data = df.train)
+
+n <- ols_step_backward_p(model.y)
+plot(n)
+
+ols_step_backward_p(model.y, details = TRUE)
+
+p.y <- model.y %>% predict(df.test)
+data.frame( R2 = R2(p.y, df.test$rent_full),
+            RMSE = RMSE(p.y, df.test$rent_full),
+            MAE = MAE(p.y, df.test$rent_full),
+            RAE = rae(p.y, df.test$rent_full))
+
+
+# Compare with the forwrad regression
+
+
+
+
+
+#### Test Models on New Testset
+
+x.test <- read.csv("X_test.csv")
+
+
+
+glimpse(x.test)
+
+
+
+
+### Data cleaning and manipulation
+
+
+# Rent is y-variable, kick out rows which do not have any obvs.
+
+x.test_NA <- subset(x.test, is.na(x.test$rent_full)) # No NAs in the y-variable
+
+view(x.test_NA)
+
+
+
+
+
+
+# Delete ID column since it is not in the training set
+
+#x.test$ID <- NULL
+
+
+view(x.test)
+
+# Replace NAs with 0 for all binary variables
+
+
+
+
+which( colnames(x.test)=="balcony" ) #get column number
+which( colnames(x.test)=="cheminee" )
+
+x.test[, 9:17][is.na(x.test[, 9:17])] <- 0 #replace NAs with 0
+
+
+which( colnames(x.test)=="dishwasher" )
+which( colnames(x.test)=="heating_pellets" )
+
+x.test[, 20:33][is.na(x.test[, 20:33])] <- 0
+
+
+which( colnames(x.test)=="kids_friendly" )
+
+x.test[, 35][is.na(x.test[, 35])] <- 0
+
+
+which( colnames(x.test)=="laundry" )
+
+x.test[, 37][is.na(x.test[, 37])] <- 0
+
+
+which( colnames(x.test)=="manlift" )
+which( colnames(x.test)=="minergie" )
+
+x.test[, 39:41][is.na(x.test[, 39:41])] <- 0
+
+
+which( colnames(x.test)=="new_building" )
+
+x.test[, 44][is.na(x.test[, 44])] <- 0
+
+
+which( colnames(x.test)=="oldbuilding" )
+which( colnames(x.test)=="public_transport" )
+
+x.test[, 46:53][is.na(x.test[, 46:53])] <- 0
+
+
+which( colnames(x.test)=="quiet" )
+which( colnames(x.test)=="raised_groundfloor" )
+
+x.test[, 56:57][is.na(x.test[, 56:57])] <- 0
+
+
+x.test[, which( colnames(x.test)=="shared_flat" ):which( colnames(x.test)=="wheelchair" )][is.na(x.test[, which( colnames(x.test)=="shared_flat" ):which( colnames(x.test)=="wheelchair" )])] <- 0 #faster approach
+
+
+
+
+
+
+
+# Drop useless variables without values
+
+sum(!is.na(x.test$appartments))
+
+x.test$appartments <- NULL
+
+x.test$descr <- NULL
+
+x.test$area_useable <- NULL
+
+
+table(x.test$bright) #check frequency 
+
+
+table(x.test$bath_tube)
+x.test$bath_tube <- NULL
+
+
+table(x.test$building_plot)
+x.test$building_plot <- NULL
+
+
+table(x.test$cabletv)
+
+
+table(x.test$cheminee)
+
+
+table(x.test$dishwasher)
+
+
+#apply(x.test[c(6:12, 14:16, 18:27, 29, 31, 33:35, 38:47, 50:51, 54:64)], 2, table) #Found an easier approach
+
+
+x.test$ceiling <- NULL
+
+x.test$garden_m2 <- NULL
+
+x.test$minergie <- NULL
+
+x.test$pets <- NULL
+
+x.test$public_transport <- NULL
+
+x.test$shared_flat <- NULL
+
+x.test$shopping <- NULL
+
+x.test$wheelchair <- NULL
+
+x.test$manlift <- NULL
+
+x.test$GDENAMK <- NULL
+
+x.test$GDENR <- NULL
+
+x.test$address <- NULL
+
+x.test$date <- NULL
+
+x.test$year <- NULL
+
+x.test$gardenshed <- NULL
+
+x.test$oven <- NULL
+
+x.test$veranda <- NULL
+
+
+# Create factors out of binary variables
+
+x.test <- subset(x.test, x.test$rooms < 10) #delete observation which values only occur once, muddies the water
+
+x.test$rooms <- round_any(x.test$rooms,0.5) #round rooms (no values except .0 and .5 are allowed)
+
+x.test$rooms <- as.factor(x.test$rooms)
+
+x.test$floors <- as.factor(x.test$floors)
+
+x.test$balcony <- as.factor(x.test$balcony)
+
+x.test$basement <- as.factor(x.test$basement)
+
+x.test$bath <- as.factor(x.test$bath)
+
+x.test$bright <- as.factor(x.test$bright)
+
+x.test$cabletv <- as.factor(x.test$cabletv)
+
+x.test$cheminee <- as.factor(x.test$cheminee)
+
+x.test$dishwasher <- as.factor(x.test$dishwasher)
+
+x.test$dryer <- as.factor(x.test$dryer)
+
+x.test$elevator <- as.factor(x.test$elevator)
+
+x.test$floors <- as.factor(x.test$floors)
+
+x.test$furnished <- as.factor(x.test$furnished)
+
+#x.test$gardenshed <- as.factor(x.test$gardenshed) this variable produces an error regression which includes all variables
+
+x.test$heating_air <- as.factor(x.test$heating_air)
+
+x.test$heating_earth <- as.factor(x.test$heating_earth)
+
+x.test$heating_electro <- as.factor(x.test$heating_electro)
+
+x.test$heating_far <- as.factor(x.test$heating_far)
+
+x.test$heating_gas <- as.factor(x.test$heating_gas)
+
+x.test$heating_oil <- as.factor(x.test$heating_oil)
+
+x.test$heating_pellets <- as.factor(x.test$heating_pellets)
+
+x.test$kids_friendly <- as.factor(x.test$kids_friendly)
+
+x.test$laundry <- as.factor(x.test$laundry)
+
+x.test$middle_house <- as.factor(x.test$middle_house)
+
+x.test$new_building <- as.factor(x.test$new_building)
+
+x.test$newly_built <- as.factor(x.test$newly_built)
+
+x.test$oldbuilding <- as.factor(x.test$oldbuilding)
+
+#x.test$oven <- as.factor(x.test$oven) this variable produces an error regression which includes all variables
+
+x.test$parking_indoor <- as.factor(x.test$parking_indoor)
+
+x.test$parking_outside <- as.factor(x.test$parking_outside)
+
+x.test$playground <- as.factor(x.test$playground)
+
+x.test$pool <- as.factor(x.test$pool)
+
+x.test$quiet <- as.factor(x.test$quiet)
+
+x.test$raised_groundfloor <- as.factor(x.test$raised_groundfloor)
+
+x.test$shower <- as.factor(x.test$shower)
+
+x.test$sunny <- as.factor(x.test$sunny)
+
+x.test$terrace <- as.factor(x.test$terrace)
+
+x.test$toilets <- as.factor(x.test$toilets)
+
+x.test$topstorage <- as.factor(x.test$topstorage)
+
+#x.test$veranda <- as.factor(x.test$veranda) this variable produces an error regression which includes all variables
+
+x.test$water <- as.factor(x.test$water)
+
+x.test$month <- as.factor(x.test$month)
+
+x.test$msregion <- as.factor(x.test$msregion)
+
+x.test$quarter_general <- as.factor(x.test$quarter_general)
+
+
+
+# Check NAs of the other variables
+
+na_count2 <-sapply(x.test, function(y) sum(length(which(is.na(y)))))
+
+
+view(na_count2)
+
+
+
+
+## Final Model Output
+
+p.m <- model.m %>% predict(x.test)
+
+
+
+
+
 
 
